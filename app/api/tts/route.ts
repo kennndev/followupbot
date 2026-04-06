@@ -18,12 +18,13 @@ export async function GET(req: NextRequest) {
     input: decodeURIComponent(text),
   });
 
-  const audioBuffer = Buffer.from(await response.arrayBuffer());
-
-  return new NextResponse(audioBuffer, {
+  // Stream directly to Twilio — audio starts playing immediately
+  // instead of waiting for the full file to generate
+  return new NextResponse(response.body as unknown as ReadableStream, {
     headers: {
       'Content-Type': 'audio/mpeg',
       'Cache-Control': 'public, max-age=3600',
+      'Transfer-Encoding': 'chunked',
     },
   });
 }
