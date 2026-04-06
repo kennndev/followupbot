@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-confirmed: #22c55e;
+  --color-rescheduled: #f59e0b;
+  --color-cancelled: #ef4444;
+  --color-unreachable: #6b7280;
+  --color-pending: #3b82f6;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #f8fafc;
+  color: #1e293b;
+}
