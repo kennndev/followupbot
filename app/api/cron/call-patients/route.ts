@@ -12,13 +12,38 @@ import { initiateCall } from '@/lib/twilio';
  * Protect with CRON_SECRET header.
  */
 export async function GET(req: NextRequest) {
+  // Support both header-based auth (Vercel cron) and query param (manual trigger)
   const authHeader = req.headers.get('authorization');
+  const querySecret = req.nextUrl.searchParams.get('secret');
   const secret = process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
+  if (secret && authHeader !== `Bearer ${secret}` && querySecret !== secret) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
   const supabase = createServerClient();
+
+  // If a specific appointmentId is passed, call that one immediately (for testing)
+  const appointmentId = req.nextUrl.searchParams.get('appointmentId');
+  if (appointmentId) {
+    const { data: appt } = await supabase
+      .from('appointments')
+      .select('id, patient_id, contact_attempts, patients(phone, name)')
+      .eq('id', appointmentId)
+      .single();
+
+    if (!appt) {
+      return NextResponse.json({ error: 'Appointment not found' }, { status: 404 });
+    }
+
+    try {
+      // @ts-ignore — supabase join typing
+      const phone = appt.patients.phone;
+      const sid = await initiateCall({ to: phone, appointmentId: appt.id });
+      return NextResponse.json({ ok: true, called: 1, results: [{ appointmentId: appt.id, callSid: sid, status: 'initiated' }] });
+    } catch (err: any) {
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+  }
 
   // Tomorrow's window in Pakistan time (UTC+5)
   const now = new Date();
