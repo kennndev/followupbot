@@ -22,10 +22,7 @@ export async function initiateCall(opts: {
     url: `${baseUrl}/api/twilio/voice?appointmentId=${opts.appointmentId}`,
     statusCallback: `${baseUrl}/api/twilio/status?appointmentId=${opts.appointmentId}`,
     statusCallbackEvent: ['initiated', 'answered', 'completed'],
-    // Machine detection: skip voicemails, call again later
-    machineDetection: 'Enable',
-    asyncAmd: 'true',
-    timeout: 20,
+    timeout: 30,
   });
 
   return call.sid;
