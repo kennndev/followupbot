@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
   if (!speechResult.trim()) {
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say(
-      { language: ctx.language === 'ur' ? 'ur-PK' : 'en-IN' },
+      { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any },
       ctx.language === 'ur'
         ? 'Maazrat, awaz nahi aayi. Dr sahib ki clinic se phir call karenge. Shukriya.'
         : 'Sorry, I did not hear you. The clinic will call again. Thank you.'
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     console.error('Conversation error:', err);
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say(
-      { language: ctx.language === 'ur' ? 'ur-PK' : 'en-IN' },
+      { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any },
       ctx.language === 'ur'
         ? 'Maazrat, koi technical masla hai. Dr. sahib ki clinic aap ko call karegi.'
         : 'Sorry, technical issue. The clinic will call you back.'
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
   if (shouldHangup || newState.step === 'done' || newState.step === 'closing') {
     // Final line + hangup + persist outcome
     twiml.say(
-      { language: ctx.language === 'ur' ? 'ur-PK' : 'en-IN', voice: 'Polly.Aditi' },
+      { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any, voice: 'Polly.Aditi' },
       reply
     );
     twiml.hangup();
@@ -138,13 +138,13 @@ export async function POST(req: NextRequest) {
       method: 'POST',
     });
     gather.say(
-      { language: ctx.language === 'ur' ? 'ur-PK' : 'en-IN', voice: 'Polly.Aditi' },
+      { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any, voice: 'Polly.Aditi' },
       reply
     );
 
     // Fallback if no reply
     twiml.say(
-      { language: ctx.language === 'ur' ? 'ur-PK' : 'en-IN' },
+      { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any },
       'Shukriya, phir baad mein baat karenge.'
     );
     twiml.hangup();
