@@ -59,6 +59,8 @@ export async function POST(req: NextRequest) {
 
   // Twilio's built-in Urdu voice via <Say language="ur-PK">
   // For higher quality, replace with <Play> of a pre-generated ElevenLabs audio URL
+  const baseUrl = process.env.TWILIO_WEBHOOK_BASE_URL;
+
   const gather = twiml.gather({
     input: ['speech'],
     language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any,
@@ -67,15 +69,11 @@ export async function POST(req: NextRequest) {
     method: 'POST',
   });
 
-  gather.say(
-    { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any, voice: 'Polly.Aditi' },
-    opening
-  );
+  gather.play(`${baseUrl}/api/tts?text=${encodeURIComponent(opening)}`);
 
-  // If no speech detected, hang up (status callback will record as no_answer)
-  twiml.say(
-    { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any },
-    'Shukriya, phir baad mein call karenge.'
+  // If no speech detected, hang up
+  twiml.play(
+    `${baseUrl}/api/tts?text=${encodeURIComponent('Shukriya, phir baad mein call karenge.')}`
   );
   twiml.hangup();
 

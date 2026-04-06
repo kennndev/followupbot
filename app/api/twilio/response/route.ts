@@ -7,10 +7,11 @@ import {
   ConversationState,
   intentToStatus,
 } from '@/lib/conversation';
+import { sendWhatsAppText } from '@/lib/whatsapp';
 
 /**
  * Handle the patient's spoken reply. Twilio posts form-encoded data including
- * SpeechResult (transcribed text). We send it to Claude, get the next line,
+ * SpeechResult (transcribed text). We send it to GPT, get the next line,
  * and either continue the conversation or hang up.
  */
 export async function POST(req: NextRequest) {
@@ -22,6 +23,8 @@ export async function POST(req: NextRequest) {
   if (!appointmentId) {
     return new NextResponse('Missing appointmentId', { status: 400 });
   }
+
+  const baseUrl = process.env.TWILIO_WEBHOOK_BASE_URL!;
 
   const formData = await req.formData();
   const speechResult = (formData.get('SpeechResult') as string) || '';
@@ -53,15 +56,17 @@ export async function POST(req: NextRequest) {
     language: appt.patients.preferred_language || 'ur',
   };
 
+  const ttsUrl = (text: string) =>
+    `${baseUrl}/api/tts?text=${encodeURIComponent(text)}`;
+
   // Handle empty speech result
   if (!speechResult.trim()) {
     const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say(
-      { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any },
+    const msg =
       ctx.language === 'ur'
         ? 'Maazrat, awaz nahi aayi. Dr sahib ki clinic se phir call karenge. Shukriya.'
-        : 'Sorry, I did not hear you. The clinic will call again. Thank you.'
-    );
+        : 'Sorry, I did not hear you. The clinic will call again. Thank you.';
+    twiml.play(ttsUrl(msg));
     twiml.hangup();
     return new NextResponse(twiml.toString(), { headers: { 'Content-Type': 'text/xml' } });
   }
@@ -71,7 +76,7 @@ export async function POST(req: NextRequest) {
     turn_count: turnCount,
   };
 
-  // Call Claude to process the reply
+  // Call GPT to process the reply
   let reply: string;
   let newState: ConversationState;
   let shouldHangup: boolean;
@@ -83,12 +88,11 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('Conversation error:', err);
     const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say(
-      { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any },
+    const msg =
       ctx.language === 'ur'
         ? 'Maazrat, koi technical masla hai. Dr. sahib ki clinic aap ko call karegi.'
-        : 'Sorry, technical issue. The clinic will call you back.'
-    );
+        : 'Sorry, technical issue. The clinic will call you back.';
+    twiml.play(ttsUrl(msg));
     twiml.hangup();
     return new NextResponse(twiml.toString(), { headers: { 'Content-Type': 'text/xml' } });
   }
@@ -112,11 +116,8 @@ export async function POST(req: NextRequest) {
   const twiml = new twilio.twiml.VoiceResponse();
 
   if (shouldHangup || newState.step === 'done' || newState.step === 'closing') {
-    // Final line + hangup + persist outcome
-    twiml.say(
-      { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any, voice: 'Polly.Aditi' },
-      reply
-    );
+    // Final line + hangup
+    twiml.play(ttsUrl(reply));
     twiml.hangup();
 
     // Update appointment status based on final intent
@@ -128,25 +129,49 @@ export async function POST(req: NextRequest) {
         patient_notes: newState.patient_notes,
       })
       .eq('id', appointmentId);
+
+    // Notify doctor immediately via WhatsApp
+    const doctorPhone = appt.doctors.phone;
+    const patientName = appt.patients.name;
+    const apptDate = new Date(appt.scheduled_for).toLocaleDateString('en-PK', {
+      weekday: 'long', month: 'long', day: 'numeric',
+    });
+
+    const statusEmoji: Record<string, string> = {
+      confirmed: '✅',
+      rescheduled: '📅',
+      cancelled: '❌',
+      no_response: '⚠️',
+    };
+    const emoji = statusEmoji[finalStatus] || '📋';
+
+    const notifyMessages: Record<string, string> = {
+      confirmed: `${emoji} *${patientName}* ne kal ki appointment confirm kar di.\nDate: ${apptDate}\nReason: ${appt.reason || 'follow-up'}`,
+      rescheduled: `${emoji} *${patientName}* reschedule karna chahte hain.\nAap unhe call karein.\n${newState.patient_notes ? `Note: ${newState.patient_notes}` : ''}`,
+      cancelled: `${emoji} *${patientName}* ne appointment cancel kar di.\n${newState.patient_notes ? `Reason: ${newState.patient_notes}` : ''}`,
+      no_response: `${emoji} *${patientName}* se baat hui lekin jawab unclear tha.\n${newState.patient_notes ? `Note: ${newState.patient_notes}` : ''}\nAap khud call kar lein.`,
+    };
+
+    const message = notifyMessages[finalStatus] || `${emoji} *${patientName}* ka call complete hua. Status: ${finalStatus}`;
+
+    try {
+      await sendWhatsAppText(doctorPhone, message);
+    } catch (err) {
+      console.error('Doctor WhatsApp notification failed:', err);
+    }
   } else {
-    // Continue the conversation: speak reply + gather next utterance
+    // Continue the conversation: play reply + gather next utterance
     const gather = twiml.gather({
       input: ['speech'],
-      language: ctx.language === 'ur' ? 'ur-PK' : 'en-IN',
+      language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any,
       speechTimeout: 'auto',
       action: `/api/twilio/response?appointmentId=${appointmentId}&state=${newState.step}&turn=${newState.turn_count}`,
       method: 'POST',
     });
-    gather.say(
-      { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any, voice: 'Polly.Aditi' },
-      reply
-    );
+    gather.play(ttsUrl(reply));
 
-    // Fallback if no reply
-    twiml.say(
-      { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any },
-      'Shukriya, phir baad mein baat karenge.'
-    );
+    // Fallback if no reply detected
+    twiml.play(ttsUrl('Shukriya, phir baad mein baat karenge.'));
     twiml.hangup();
   }
 
