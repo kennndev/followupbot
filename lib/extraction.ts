@@ -1,8 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { ExtractedPatientData } from './supabase';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 /**
@@ -63,34 +63,29 @@ export async function extractPatientFromVoiceNote(
 ): Promise<ExtractedPatientData> {
   const systemPrompt = buildExtractionPrompt(today);
 
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
     max_tokens: 500,
-    system: systemPrompt,
     messages: [
+      { role: 'system', content: systemPrompt },
       {
         role: 'user',
         content: `Transcript:\n"${transcript}"\n\nExtract the structured data as JSON.`,
       },
     ],
+    response_format: { type: 'json_object' },
   });
 
-  const textBlock = response.content.find((b) => b.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') {
-    throw new Error('Claude returned no text content');
+  const text = response.choices[0]?.message?.content;
+  if (!text) {
+    throw new Error('OpenAI returned no text content');
   }
 
-  // Strip any markdown fences the model might add despite instructions
-  const clean = textBlock.text
-    .replace(/```json\s*/g, '')
-    .replace(/```\s*/g, '')
-    .trim();
-
   try {
-    const parsed = JSON.parse(clean) as ExtractedPatientData;
+    const parsed = JSON.parse(text) as ExtractedPatientData;
     return parsed;
   } catch (err) {
-    throw new Error(`Failed to parse Claude response as JSON: ${clean}`);
+    throw new Error(`Failed to parse OpenAI response as JSON: ${text}`);
   }
 }
 

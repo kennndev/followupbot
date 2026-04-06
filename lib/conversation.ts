@@ -1,7 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 export type CallIntent =
@@ -83,25 +83,25 @@ Respond with a JSON object (no markdown, just JSON):
   "should_hangup": boolean
 }`;
 
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
     max_tokens: 400,
-    system: systemPrompt,
     messages: [
+      { role: 'system', content: systemPrompt },
       {
         role: 'user',
         content: `Patient said: "${patientUtterance}"\n\nRespond with the JSON.`,
       },
     ],
+    response_format: { type: 'json_object' },
   });
 
-  const textBlock = response.content.find((b) => b.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') {
-    throw new Error('Claude returned no text');
+  const text = response.choices[0]?.message?.content;
+  if (!text) {
+    throw new Error('OpenAI returned no text');
   }
 
-  const clean = textBlock.text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-  const parsed = JSON.parse(clean);
+  const parsed = JSON.parse(text);
 
   const newState: ConversationState = {
     step: parsed.next_step,
