@@ -61,20 +61,20 @@ export async function POST(req: NextRequest) {
   // For higher quality, replace with <Play> of a pre-generated ElevenLabs audio URL
   const gather = twiml.gather({
     input: ['speech'],
-    language: ctx.language === 'ur' ? 'ur-PK' : 'en-IN',
+    language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any,
     speechTimeout: 'auto',
     action: `/api/twilio/response?appointmentId=${appointmentId}&state=greeting`,
     method: 'POST',
   });
 
   gather.say(
-    { language: ctx.language === 'ur' ? 'ur-PK' : 'en-IN', voice: 'Polly.Aditi' },
+    { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any, voice: 'Polly.Aditi' },
     opening
   );
 
   // If no speech detected, hang up (status callback will record as no_answer)
   twiml.say(
-    { language: ctx.language === 'ur' ? 'ur-PK' : 'en-IN' },
+    { language: (ctx.language === 'ur' ? 'ur-PK' : 'en-IN') as any },
     'Shukriya, phir baad mein call karenge.'
   );
   twiml.hangup();
