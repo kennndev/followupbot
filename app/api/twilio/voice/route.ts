@@ -51,6 +51,8 @@ export async function POST(req: NextRequest) {
     }),
     appointment_reason: appt.reason || 'follow-up',
     language: appt.patients.preferred_language || 'ur',
+    diagnosis: appt.patients.diagnosis || undefined,
+    medications: appt.patients.medications || undefined,
   };
 
   const opening = buildOpeningLine(ctx);

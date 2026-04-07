@@ -29,6 +29,8 @@ export interface CallContext {
   appointment_date: string; // human-readable
   appointment_reason: string;
   language: 'ur' | 'en' | 'pa';
+  diagnosis?: string;    // e.g. "Hypertension, post-MI"
+  medications?: string;  // e.g. "Concor 5mg, Aspirin 75mg"
 }
 
 /**
@@ -56,7 +58,7 @@ Context:
 - Patient: ${ctx.patient_name}
 - Appointment: ${ctx.appointment_date}
 - Reason: ${ctx.appointment_reason}
-- Language: respond in ${ctx.language === 'ur' ? 'Urdu (Roman Urdu script is fine for TTS)' : 'English'}
+- Language: respond in ${ctx.language === 'ur' ? 'Urdu (Roman Urdu script is fine for TTS)' : 'English'}${ctx.diagnosis ? `\n- Diagnosis: ${ctx.diagnosis}` : ''}${ctx.medications ? `\n- Current medications: ${ctx.medications}` : ''}
 
 Your job is a reminder call with exactly this flow:
 1. GREETING (already done) — you've asked if they can come.
